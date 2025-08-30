@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>赤ちゃんスケジュールプランナー</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>👶</text></svg>">
     <link rel="stylesheet" href="index.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -212,11 +213,11 @@
                             <div class="timeline-activity">${item.activity}</div>
                         </li>
                     `).join('')}
+                    <div class="current-time-indicator" id="current-time-indicator" style="display: none;"></div>
                 </ul>
-                <div class="current-time-indicator" id="current-time-indicator" style="display: none;"></div>
             `;
             DOMElements.timelineViewContainer.innerHTML = timelineHTML;
-            updateCurrentTimeIndicator();
+            setTimeout(updateCurrentTimeIndicator, 0);
         }
 
         function updateCurrentTimeIndicator() {

@@ -124,11 +124,11 @@ function renderTimelineView(schedule, currentTime) {
                     <div class="timeline-activity">${item.activity}</div>
                 </li>
             `).join('')}
+            <div class="current-time-indicator" id="current-time-indicator" style="display: none;"></div>
         </ul>
-        <div class="current-time-indicator" id="current-time-indicator" style="display: none;"></div>
     `;
     DOMElements.timelineViewContainer.innerHTML = timelineHTML;
-    updateCurrentTimeIndicator();
+    setTimeout(updateCurrentTimeIndicator, 0);
 }
 
 function updateCurrentTimeIndicator() {
