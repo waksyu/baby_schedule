@@ -44,7 +44,7 @@
         <div id="initial-controls">
             <div class="controls">
                 <div class="control-group">
-                    <label>⏰ 起床時間を選んでね</label>
+                    <label>🍼 最初のミルクの時間を選んでね</label>
                     <div class="time-options">
                         <button class="time-option-btn" data-time="06:00">06:00</button>
                         <button class="time-option-btn" data-time="06:30">06:30</button>
@@ -80,7 +80,7 @@
         </div>
         
         <div id="placeholder" class="placeholder">
-            <p>赤ちゃんの起床時間を選ぶと、1日のスケジュールが自動で作成されます。</p>
+            <p>赤ちゃんの最初のミルクの時間を選ぶと、1日のスケジュールが自動で作成されます。</p>
         </div>
     </div>
     
@@ -129,7 +129,6 @@
         };
 
         const getColor = (activity) => {
-            if (activity.startsWith('起床')) return '#FFDDC1';
             if (activity.startsWith('ミルク')) return '#FFFACD';
             if (activity.includes('お昼寝')) return '#E6E6FA';
             if (activity.startsWith('お風呂')) return '#B2EBF2';
@@ -352,7 +351,7 @@
                 if (currentHourDecimal >= CLOCK_START_HOUR && currentHourDecimal < CLOCK_END_HOUR) {
                     const angle = timeToAngle(currentHourDecimal);
                     const endPos = polarToCartesian(center, center, innerRadius, angle);
-                    currentTimeHand = `<line x1="${center}" y1="${center}" x2="${endPos.x}" y2="${endPos.y}" stroke="#007bff" stroke-width="2" />`;
+                    currentTimeHand = `<line class="current-time-hand" x1="${center}" y1="${center}" x2="${endPos.x}" y2="${endPos.y}" stroke="#007bff" stroke-width="2" />`;
                 }
             }
             
@@ -507,8 +506,6 @@
                 }
                 
                 const milkTimes = potentialMilkTimes.filter(t => t < bedtime);
-
-                events.push({ time: formatTime(wakeUp), activity: '起床', icon: '☀️' });
                 
                 milkTimes.forEach((milkTime) => {
                     events.push({ time: formatTime(milkTime), activity: 'ミルク', icon: '🍼', duration: 0.5 });
@@ -587,6 +584,8 @@
             // Remove time indicator for cleaner image
             const indicator = captureContainer.querySelector('#current-time-indicator');
             if (indicator) indicator.remove();
+            const clockIndicator = captureContainer.querySelector('.current-time-hand');
+            if (clockIndicator) clockIndicator.remove();
 
 
             try {

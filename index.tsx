@@ -39,7 +39,6 @@ const parseTime = (timeStr) => {
 };
 
 const getColor = (activity) => {
-    if (activity.startsWith('起床')) return '#FFDDC1';
     if (activity.startsWith('ミルク')) return '#FFFACD';
     if (activity.includes('お昼寝')) return '#E6E6FA';
     if (activity.startsWith('お風呂')) return '#B2EBF2';
@@ -265,7 +264,7 @@ function renderClockView(schedule, currentTime) {
         if (currentHourDecimal >= CLOCK_START_HOUR && currentHourDecimal < CLOCK_END_HOUR) {
             const angle = timeToAngle(currentHourDecimal);
             const endPos = polarToCartesian(center, center, innerRadius, angle);
-            currentTimeHand = `<line x1="${center}" y1="${center}" x2="${endPos.x}" y2="${endPos.y}" stroke="#007bff" stroke-width="2" />`;
+            currentTimeHand = `<line class="current-time-hand" x1="${center}" y1="${center}" x2="${endPos.x}" y2="${endPos.y}" stroke="#007bff" stroke-width="2" />`;
         }
     }
     
@@ -421,8 +420,6 @@ function generateSchedule() {
         }
         
         const milkTimes = potentialMilkTimes.filter(t => t < bedtime);
-
-        events.push({ time: formatTime(wakeUp), activity: '起床', icon: '☀️' });
         
         milkTimes.forEach((milkTime) => {
             events.push({ time: formatTime(milkTime), activity: 'ミルク', icon: '🍼', duration: 0.5 });
@@ -502,6 +499,8 @@ async function handleDownload(layout, buttonElement) {
     // Remove time indicator for cleaner image
     const indicator = captureContainer.querySelector('#current-time-indicator');
     if (indicator) indicator.remove();
+    const clockIndicator = captureContainer.querySelector('.current-time-hand');
+    if (clockIndicator) clockIndicator.remove();
 
 
     try {
