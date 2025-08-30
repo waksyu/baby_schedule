@@ -1,4 +1,5 @@
-// FIX: Declare html2canvas to resolve 'Cannot find name' error.
+// html2canvasはindex.htmlのCDNからグローバルに読み込まれます。
+// Fix: Declare html2canvas to resolve 'Cannot find name' error.
 declare var html2canvas: any;
 
 // State Management
@@ -58,7 +59,8 @@ const getFormattedDate = () => {
 // DOM Elements
 const DOMElements = {
     initialControls: document.getElementById('initial-controls'),
-    timeOptionBtns: document.querySelectorAll('.time-option-btn'),
+    // Fix: Specify HTMLElement for querySelectorAll to correctly type 'btn.dataset'.
+    timeOptionBtns: document.querySelectorAll<HTMLElement>('.time-option-btn'),
     generateBtn: document.getElementById('generate-btn'),
     loader: document.getElementById('loader'),
     scheduleDisplay: document.getElementById('schedule-display'),
@@ -94,8 +96,8 @@ function render() {
 
     // Wake up time buttons
     DOMElements.timeOptionBtns.forEach(btn => {
-        // FIX: Cast btn to HTMLElement to access dataset property.
-        if ((btn as HTMLElement).dataset.time === state.wakeUpTime) {
+        // Fix: 'dataset' property is now correctly recognized due to querySelectorAll<HTMLElement> change.
+        if (btn.dataset.time === state.wakeUpTime) {
             btn.classList.add('selected');
         } else {
             btn.classList.remove('selected');
@@ -157,17 +159,17 @@ function updateCurrentTimeIndicator() {
     const nextEventIndex = prevEventIndex + 1;
 
     const listItems = timeline.children;
-    const prevEventElement = listItems[prevEventIndex];
-    const nextEventElement = listItems[nextEventIndex];
+    // Fix: Cast timeline children to HTMLElement to access offsetTop and offsetHeight.
+    const prevEventElement = listItems[prevEventIndex] as HTMLElement;
+    const nextEventElement = listItems[nextEventIndex] as HTMLElement;
 
     if (!prevEventElement || !nextEventElement) {
         indicator.style.display = 'none';
         return;
     }
 
-    // FIX: Cast prevEventElement and nextEventElement to HTMLElement to access offsetTop and offsetHeight properties.
-    const prevEventTop = (prevEventElement as HTMLElement).offsetTop + (prevEventElement as HTMLElement).offsetHeight / 2;
-    const nextEventTop = (nextEventElement as HTMLElement).offsetTop + (nextEventElement as HTMLElement).offsetHeight / 2;
+    const prevEventTop = prevEventElement.offsetTop + prevEventElement.offsetHeight / 2;
+    const nextEventTop = nextEventElement.offsetTop + nextEventElement.offsetHeight / 2;
 
     const prevEventTime = parseTime(state.schedule[prevEventIndex].time);
     const nextEventTime = parseTime(state.schedule[nextEventIndex].time);
@@ -378,11 +380,13 @@ function renderSettingsPopup() {
 
     DOMElements.settingsPopupContainer.querySelectorAll('input[type="number"]').forEach(input => {
         input.addEventListener('change', (e) => {
-            // FIX: Cast e.target to HTMLInputElement to access dataset and value properties.
+            // Fix: Cast event target to HTMLInputElement to access dataset and value properties.
             const target = e.target as HTMLInputElement;
             const setting = target.dataset.setting;
             const value = target.value;
-            state.settings[setting] = Number(value);
+            if (setting) {
+                (state.settings as any)[setting] = Number(value);
+            }
         });
     });
 }
@@ -470,20 +474,21 @@ function reset() {
     render();
 }
 
-async function handleDownload(layout: 'horizontal' | 'vertical', buttonElement: HTMLButtonElement) {
+async function handleDownload(layout, buttonElement) {
     if (state.isDownloading) return;
     state.isDownloading = true;
 
     buttonElement.classList.add('downloading');
     const actionButtons = [
-        DOMElements.downloadHorizontalBtn as HTMLButtonElement,
-        DOMElements.downloadVerticalBtn as HTMLButtonElement,
-        DOMElements.resetBtn as HTMLButtonElement,
-        DOMElements.settingsBtn as HTMLButtonElement,
-        DOMElements.shiftBackBtn as HTMLButtonElement,
-        DOMElements.shiftForwardBtn as HTMLButtonElement,
+        DOMElements.downloadHorizontalBtn,
+        DOMElements.downloadVerticalBtn,
+        DOMElements.resetBtn,
+        DOMElements.settingsBtn,
+        DOMElements.shiftBackBtn,
+        DOMElements.shiftForwardBtn,
     ];
-    actionButtons.forEach(btn => btn.disabled = true);
+    // Fix: Cast buttons to HTMLButtonElement to set the disabled property.
+    actionButtons.forEach(btn => (btn as HTMLButtonElement).disabled = true);
 
     const containerId = layout === 'horizontal' ? 'horizontal-capture-container' : 'vertical-capture-container';
     const captureContainer = document.getElementById(containerId);
@@ -501,6 +506,7 @@ async function handleDownload(layout: 'horizontal' | 'vertical', buttonElement: 
 
     try {
         await new Promise(resolve => setTimeout(resolve, 100));
+        // Fix: html2canvas is now declared globally.
         const canvas = await html2canvas(captureContainer, { scale: 2, backgroundColor: '#FFF9E6' });
         const now = new Date();
         const dateString = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
@@ -514,7 +520,8 @@ async function handleDownload(layout: 'horizontal' | 'vertical', buttonElement: 
     } finally {
         state.isDownloading = false;
         buttonElement.classList.remove('downloading');
-        actionButtons.forEach(btn => btn.disabled = false);
+        // Fix: Cast buttons to HTMLButtonElement to set the disabled property.
+        actionButtons.forEach(btn => (btn as HTMLButtonElement).disabled = false);
         captureContainer.innerHTML = ''; // Clean up
     }
 }
@@ -525,8 +532,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // Set up event listeners
     DOMElements.timeOptionBtns.forEach(btn => {
         btn.addEventListener('click', () => {
-            // FIX: Cast btn to HTMLElement to access dataset property.
-            state.wakeUpTime = (btn as HTMLElement).dataset.time;
+            // Fix: 'dataset' property is now correctly recognized due to querySelectorAll<HTMLElement> change.
+            state.wakeUpTime = btn.dataset.time;
             render();
         });
     });
@@ -539,19 +546,23 @@ document.addEventListener('DOMContentLoaded', () => {
     DOMElements.shiftBackBtn.addEventListener('click', () => shiftSchedule(-30));
     DOMElements.shiftForwardBtn.addEventListener('click', () => shiftSchedule(30));
     DOMElements.resetBtn.addEventListener('click', reset);
-    DOMElements.downloadHorizontalBtn.addEventListener('click', (e) => handleDownload('horizontal', e.currentTarget as HTMLButtonElement));
-    DOMElements.downloadVerticalBtn.addEventListener('click', (e) => handleDownload('vertical', e.currentTarget as HTMLButtonElement));
+    DOMElements.downloadHorizontalBtn.addEventListener('click', (e) => handleDownload('horizontal', e.currentTarget as HTMLElement));
+    DOMElements.downloadVerticalBtn.addEventListener('click', (e) => handleDownload('vertical', e.currentTarget as HTMLElement));
 
 
     // Tooltip listener
     document.body.addEventListener('mousemove', (e) => {
-        // FIX: Cast e.target to HTMLElement to access classList and dataset properties.
-        const target = e.target as HTMLElement;
-        if (target.classList.contains('clock-sector') && target.dataset.tooltip) {
-            DOMElements.tooltip.textContent = target.dataset.tooltip;
-            DOMElements.tooltip.style.left = `${e.clientX + 10}px`;
-            DOMElements.tooltip.style.top = `${e.clientY}px`;
-            DOMElements.tooltip.style.display = 'block';
+        // Fix: Use a type guard to safely access properties on the event target.
+        const target = e.target;
+        if (target instanceof Element) {
+            if (target.classList.contains('clock-sector') && (target as SVGElement).dataset.tooltip) {
+                DOMElements.tooltip.textContent = (target as SVGElement).dataset.tooltip;
+                DOMElements.tooltip.style.left = `${e.clientX + 10}px`;
+                DOMElements.tooltip.style.top = `${e.clientY}px`;
+                DOMElements.tooltip.style.display = 'block';
+            } else {
+                DOMElements.tooltip.style.display = 'none';
+            }
         } else {
             DOMElements.tooltip.style.display = 'none';
         }
