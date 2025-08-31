@@ -187,7 +187,7 @@ function updateCurrentTimeIndicator() {
     timeText.textContent = `${hours}:${minutes}`;
 
     indicator.style.top = `${topPosition}px`;
-    indicator.style.display = 'flex';
+    indicator.style.display = 'block';
 }
 
 function renderClockView(schedule, currentTime) {

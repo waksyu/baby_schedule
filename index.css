@@ -336,13 +336,7 @@ input[type="number"] {
     z-index: 3;
     pointer-events: none;
     transform: translateY(-50%);
-    display: -webkit-flex; /* for older browser compatibility */
-    display: flex;
-    -webkit-align-items: center; /* for older browser compatibility */
-    align-items: center;
-    -webkit-justify-content: flex-end; /* for older browser compatibility */
-    justify-content: flex-end;
-    color: white; /* Ensure text inside is white */
+    /* Flexbox related properties are removed for better compatibility */
 }
 
 .current-time-indicator::before {
@@ -359,6 +353,13 @@ input[type="number"] {
 }
 
 .current-time-text {
+    /* Positioned absolutely to the right edge for robust layout */
+    position: absolute;
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    
+    /* Visual styles */
     background-color: #007bff;
     color: white;
     padding: 2px 6px;
