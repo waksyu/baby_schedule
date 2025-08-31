@@ -317,45 +317,45 @@ function renderSettingsPopup() {
         `<fieldset class="customize-section">
             <legend>基本設定</legend>
             <div class="control-group">
-                <label for="milkInterval">ミルクの間隔 (時間)</label>
+                <label for="milkInterval">ミルクの間隔 (N時間)</label>
                 <input type="number" id="milkInterval" data-setting="milkInterval" value="${milkInterval}" min="2" max="5" step="0.5" />
             </div>
             <legend>お昼寝の設定</legend>
             <div class="control-group">
-                <label for="morningNapOffset">朝寝開始 (最初のミルクから, 時間)</label>
+                <label for="morningNapOffset">朝寝開始 (最初のミルクから, N時間後)</label>
                 <input type="number" id="morningNapOffset" data-setting="morningNapOffset" value="${morningNapOffset}" min="0" step="0.5" />
             </div>
             <div class="control-group">
-                <label for="morningNapDuration">朝寝の時間 (時間)</label>
+                <label for="morningNapDuration">朝寝の長さ (N時間)</label>
                 <input type="number" id="morningNapDuration" data-setting="morningNapDuration" value="${morningNapDuration}" min="0" step="0.5" />
             </div>
             <div class="control-group">
-                <label for="afternoonNap1Offset">昼寝開始 (2回目のミルクから, 時間)</label>
+                <label for="afternoonNap1Offset">昼寝開始 (2回目のミルクから, N時間後)</label>
                 <input type="number" id="afternoonNap1Offset" data-setting="afternoonNap1Offset" value="${afternoonNap1Offset}" min="0" step="0.5" />
             </div>
             <div class="control-group">
-                <label for="afternoonNap1Duration">昼寝の時間 (時間)</label>
+                <label for="afternoonNap1Duration">昼寝の長さ (N時間)</label>
                 <input type="number" id="afternoonNap1Duration" data-setting="afternoonNap1Duration" value="${afternoonNap1Duration}" min="0" step="0.5" />
             </div>
             <div class="control-group">
-                <label for="afternoonNap2Offset">夕寝開始 (3回目のミルクから, 時間)</label>
+                <label for="afternoonNap2Offset">夕寝開始 (3回目のミルクから, N時間後)</label>
                 <input type="number" id="afternoonNap2Offset" data-setting="afternoonNap2Offset" value="${afternoonNap2Offset}" min="0" step="0.5" />
             </div>
             <div class="control-group">
-                <label for="afternoonNap2Duration">夕寝の時間 (時間)</label>
+                <label for="afternoonNap2Duration">夕寝の長さ (N時間)</label>
                 <input type="number" id="afternoonNap2Duration" data-setting="afternoonNap2Duration" value="${afternoonNap2Duration}" min="0" step="0.5" />
             </div>
             <legend>夜の準備</legend>
             <div class="control-group">
-                <label for="bathOffset">お風呂開始 (17時以降のミルクから, 時間)</label>
+                <label for="bathOffset">お風呂開始 (16時以降のミルクから, N時間後)</label>
                 <input type="number" id="bathOffset" data-setting="bathOffset" value="${bathOffset}" min="0" step="0.5" />
             </div>
             <div class="control-group">
-                <label for="bathDuration">お風呂の時間 (時間)</label>
+                <label for="bathDuration">お風呂の長さ (N時間)</label>
                 <input type="number" id="bathDuration" data-setting="bathDuration" value="${bathDuration}" min="0" step="0.5" />
             </div>
             <div class="control-group">
-                <label for="bedtimeOffset">寝かしつけ (お風呂の後, 時間)</label>
+                <label for="bedtimeOffset">寝かしつけ (お風呂の後, N時間後)</label>
                 <input type="number" id="bedtimeOffset" data-setting="bedtimeOffset" value="${bedtimeOffset}" min="0" step="0.5" />
             </div>
         </fieldset>`;
@@ -411,9 +411,9 @@ function generateSchedule() {
             currentMilkTime += state.settings.milkInterval;
         }
         
-        const firstMilkAfter5PM = potentialMilkTimes.find(t => t >= 17);
-        if (firstMilkAfter5PM) {
-            bathTime = firstMilkAfter5PM + state.settings.bathOffset;
+        const firstMilkAfter4PM = potentialMilkTimes.find(t => t >= 16);
+        if (firstMilkAfter4PM) {
+            bathTime = firstMilkAfter4PM + state.settings.bathOffset;
             bedtime = bathTime + state.settings.bathDuration + state.settings.bedtimeOffset;
         } else {
             bedtime = wakeUp + 14;
