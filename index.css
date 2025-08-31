@@ -335,10 +335,14 @@ input[type="number"] {
     background-color: #007bff;
     z-index: 3;
     pointer-events: none;
-    transform: translateY(-50%); /* Center vertically on the exact time */
+    transform: translateY(-50%);
+    display: -webkit-flex; /* for older browser compatibility */
     display: flex;
+    -webkit-align-items: center; /* for older browser compatibility */
     align-items: center;
+    -webkit-justify-content: flex-end; /* for older browser compatibility */
     justify-content: flex-end;
+    color: white; /* Ensure text inside is white */
 }
 
 .current-time-indicator::before {
