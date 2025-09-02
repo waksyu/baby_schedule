@@ -25,7 +25,41 @@ let state = {
     isDownloading: false,
 };
 
-// Helper Functions
+// --- LocalStorage Persistence ---
+function saveState() {
+    try {
+        const stateToSave = {
+            wakeUpTime: state.wakeUpTime,
+            settings: state.settings,
+            schedule: state.schedule,
+        };
+        localStorage.setItem('babyScheduleState', JSON.stringify(stateToSave));
+    } catch (error) {
+        console.error("Could not save state to localStorage", error);
+    }
+}
+
+function loadState() {
+    try {
+        const savedStateJSON = localStorage.getItem('babyScheduleState');
+        if (savedStateJSON) {
+            const savedState = JSON.parse(savedStateJSON);
+            state = {
+                ...state,
+                ...savedState,
+                currentTime: new Date(), // Always use fresh time
+                isLoading: false,       // Reset transient state
+                isSettingsOpen: false,
+            };
+        }
+    } catch (error) {
+        console.error("Could not load state from localStorage", error);
+        // Proceed with default state
+    }
+}
+
+
+// --- Helper Functions ---
 const formatTime = (time) => {
     const hours = Math.floor(time);
     const minutes = Math.round((time - hours) * 60);
@@ -33,6 +67,7 @@ const formatTime = (time) => {
 };
 
 const parseTime = (timeStr) => {
+    if (!timeStr) return 0;
     const [hours, minutes] = timeStr.split(':').map(Number);
     return hours + minutes / 60;
 };
@@ -53,6 +88,26 @@ const getFormattedDate = () => {
     const dayOfWeek = ['日', '月', '火', '水', '木', '金', '土'][now.getDay()];
     return `${year}年${month}月${day}日(${dayOfWeek})`;
 };
+
+// --- Clock View Helpers ---
+const CLOCK_SIZE = 320;
+const CLOCK_CENTER = CLOCK_SIZE / 2;
+const CLOCK_OUTER_RADIUS = CLOCK_SIZE / 2 - 10;
+const CLOCK_LABEL_BAND_WIDTH = 45;
+const CLOCK_INNER_RADIUS = CLOCK_OUTER_RADIUS - CLOCK_LABEL_BAND_WIDTH;
+const CLOCK_START_HOUR = 9;
+const CLOCK_END_HOUR = 21;
+const CLOCK_TOTAL_HOURS = CLOCK_END_HOUR - CLOCK_START_HOUR;
+
+const polarToCartesian = (centerX, centerY, radius, angleInDegrees) => {
+    const angleInRadians = (angleInDegrees - 90) * Math.PI / 180.0;
+    return {
+        x: centerX + (radius * Math.cos(angleInRadians)),
+        y: centerY + (radius * Math.sin(angleInRadians)),
+    };
+};
+const timeToAngle = (time) => (time - CLOCK_START_HOUR) / CLOCK_TOTAL_HOURS * 360 - 90;
+
 
 // DOM Elements
 const DOMElements = {
@@ -102,14 +157,14 @@ function render() {
 
     if (state.schedule) {
         DOMElements.scheduleDate.textContent = getFormattedDate();
-        renderTimelineView(state.schedule, state.currentTime);
-        renderClockView(state.schedule, state.currentTime);
+        renderTimelineView(state.schedule);
+        renderClockView(state.schedule);
     }
 
     renderSettingsPopup();
 }
 
-function renderTimelineView(schedule, currentTime) {
+function renderTimelineView(schedule) {
     const timelineHTML = `
         <ul class="timeline" id="timeline-list">
             ${schedule.map(item => `
@@ -190,26 +245,7 @@ function updateCurrentTimeIndicator() {
     indicator.style.display = 'block';
 }
 
-function renderClockView(schedule, currentTime) {
-    const size = 320;
-    const center = size / 2;
-    const outerRadius = size / 2 - 10;
-    const labelBandWidth = 45;
-    const innerRadius = outerRadius - labelBandWidth;
-    const CLOCK_START_HOUR = 9;
-    const CLOCK_END_HOUR = 21;
-    const TOTAL_HOURS = CLOCK_END_HOUR - CLOCK_START_HOUR;
-
-    const polarToCartesian = (centerX, centerY, radius, angleInDegrees) => {
-        const angleInRadians = (angleInDegrees - 90) * Math.PI / 180.0;
-        return {
-            x: centerX + (radius * Math.cos(angleInRadians)),
-            y: centerY + (radius * Math.sin(angleInRadians)),
-        };
-    };
-
-    const timeToAngle = (time) => (time - CLOCK_START_HOUR) / TOTAL_HOURS * 360 - 90;
-
+function renderClockView(schedule) {
     const describeSector = (x, y, radius, startAngle, endAngle) => {
         if (endAngle - startAngle >= 360) endAngle = startAngle + 359.99;
         const start = polarToCartesian(x, y, radius, startAngle);
@@ -239,47 +275,37 @@ function renderClockView(schedule, currentTime) {
         const startAngle = timeToAngle(startTime);
         const endAngle = timeToAngle(endTime);
         const midAngle = startAngle + (endAngle - startAngle) / 2;
-        const iconRadius = innerRadius * 0.7;
-        const iconPos = polarToCartesian(center, center, iconRadius, midAngle);
+        const iconRadius = CLOCK_INNER_RADIUS * 0.7;
+        const iconPos = polarToCartesian(CLOCK_CENTER, CLOCK_CENTER, iconRadius, midAngle);
 
         return {
             ...event,
-            path: describeSector(center, center, innerRadius, startAngle, endAngle),
+            path: describeSector(CLOCK_CENTER, CLOCK_CENTER, CLOCK_INNER_RADIUS, startAngle, endAngle),
             color: getColor(event.activity),
             iconPos
         };
     });
     
-    const timeLabels = Array.from({ length: TOTAL_HOURS + 1 }, (_, i) => {
+    const timeLabels = Array.from({ length: CLOCK_TOTAL_HOURS + 1 }, (_, i) => {
         const hour = CLOCK_START_HOUR + i;
         const angle = timeToAngle(hour);
-        const pos = polarToCartesian(center, center, outerRadius - labelBandWidth / 2, angle);
-        let label = i === 0 ? `${CLOCK_START_HOUR}・${CLOCK_END_HOUR}` : (i === TOTAL_HOURS ? '' : String(hour));
+        const pos = polarToCartesian(CLOCK_CENTER, CLOCK_CENTER, CLOCK_OUTER_RADIUS - CLOCK_LABEL_BAND_WIDTH / 2, angle);
+        let label = i === 0 ? `${CLOCK_START_HOUR}・${CLOCK_END_HOUR}` : (i === CLOCK_TOTAL_HOURS ? '' : String(hour));
         const markerLength = (hour % 2 === 0) ? 8 : 4;
-        const markerInnerPos = polarToCartesian(center, center, outerRadius - markerLength, angle);
-        const markerPosEnd = polarToCartesian(center, center, outerRadius, angle);
-        return { hour, pos, label, markerInnerPos, markerPosEnd, isStartEnd: i === 0 || i === TOTAL_HOURS };
+        const markerInnerPos = polarToCartesian(CLOCK_CENTER, CLOCK_CENTER, CLOCK_OUTER_RADIUS - markerLength, angle);
+        const markerPosEnd = polarToCartesian(CLOCK_CENTER, CLOCK_CENTER, CLOCK_OUTER_RADIUS, angle);
+        return { hour, pos, label, markerInnerPos, markerPosEnd, isStartEnd: i === 0 || i === CLOCK_TOTAL_HOURS };
     });
-
-    let currentTimeHand = '';
-    if (currentTime) {
-        const currentHourDecimal = currentTime.getHours() + currentTime.getMinutes() / 60;
-        if (currentHourDecimal >= CLOCK_START_HOUR && currentHourDecimal < CLOCK_END_HOUR) {
-            const angle = timeToAngle(currentHourDecimal);
-            const endPos = polarToCartesian(center, center, innerRadius, angle);
-            currentTimeHand = `<line class="current-time-hand" x1="${center}" y1="${center}" x2="${endPos.x}" y2="${endPos.y}" stroke="#007bff" stroke-width="2" />`;
-        }
-    }
     
-    const sunPos = polarToCartesian(center, center, outerRadius - labelBandWidth/2, -75);
-    const moonPos = polarToCartesian(center, center, outerRadius - labelBandWidth/2, -105);
+    const sunPos = polarToCartesian(CLOCK_CENTER, CLOCK_CENTER, CLOCK_OUTER_RADIUS - CLOCK_LABEL_BAND_WIDTH/2, -75);
+    const moonPos = polarToCartesian(CLOCK_CENTER, CLOCK_CENTER, CLOCK_OUTER_RADIUS - CLOCK_LABEL_BAND_WIDTH/2, -105);
 
     const clockHTML = `
         <div class="clock-container">
-            <svg viewBox="0 0 ${size} ${size}" width="100%" height="100%">
-                <circle cx="${center}" cy="${center}" r="${outerRadius}" fill="#f0f0f0" />
-                <circle cx="${center}" cy="${center}" r="${innerRadius}" fill="white" />
-                ${clockSectors.map((sector, i) => `
+            <svg viewBox="0 0 ${CLOCK_SIZE} ${CLOCK_SIZE}" width="100%" height="100%">
+                <circle cx="${CLOCK_CENTER}" cy="${CLOCK_CENTER}" r="${CLOCK_OUTER_RADIUS}" fill="#f0f0f0" />
+                <circle cx="${CLOCK_CENTER}" cy="${CLOCK_CENTER}" r="${CLOCK_INNER_RADIUS}" fill="white" />
+                ${clockSectors.map((sector) => `
                     <path
                         d="${sector.path}"
                         fill="${sector.color}"
@@ -287,25 +313,42 @@ function renderClockView(schedule, currentTime) {
                         data-tooltip="${sector.time}: ${sector.activity}"
                     />
                 `).join('')}
-                ${timeLabels.map(({ hour, pos, label, markerInnerPos, markerPosEnd, isStartEnd }) => `
+                ${timeLabels.map(({ pos, label, markerInnerPos, markerPosEnd, isStartEnd }) => `
                     <g>
                         ${!isStartEnd ? `<line x1="${markerInnerPos.x}" y1="${markerInnerPos.y}" x2="${markerPosEnd.x}" y2="${markerPosEnd.y}" stroke="#ccc" stroke-width="1" />` : ''}
                         ${label ? `<text x="${pos.x}" y="${pos.y}" text-anchor="middle" dominant-baseline="middle" font-weight="bold" font-size="14">${label}</text>` : ''}
                     </g>
                 `).join('')}
-                 <line x1="${polarToCartesian(center, center, innerRadius, -90).x}" y1="${polarToCartesian(center, center, innerRadius, -90).y}" x2="${polarToCartesian(center, center, outerRadius, -90).x}" y2="${polarToCartesian(center, center, outerRadius, -90).y}" stroke="black" stroke-width="2" />
+                 <line x1="${polarToCartesian(CLOCK_CENTER, CLOCK_CENTER, CLOCK_INNER_RADIUS, -90).x}" y1="${polarToCartesian(CLOCK_CENTER, CLOCK_CENTER, CLOCK_INNER_RADIUS, -90).y}" x2="${polarToCartesian(CLOCK_CENTER, CLOCK_CENTER, CLOCK_OUTER_RADIUS, -90).x}" y2="${polarToCartesian(CLOCK_CENTER, CLOCK_CENTER, CLOCK_OUTER_RADIUS, -90).y}" stroke="black" stroke-width="2" />
                  <text x="${sunPos.x}" y="${sunPos.y}" text-anchor="middle" dominant-baseline="middle" font-size="16">↑🌞</text>
                  <text x="${moonPos.x}" y="${moonPos.y}" text-anchor="middle" dominant-baseline="middle" font-size="16">↑🌙</text>
-                ${clockSectors.map((sector, i) => `
+                ${clockSectors.map((sector) => `
                     <text x="${sector.iconPos.x}" y="${sector.iconPos.y}" text-anchor="middle" dominant-baseline="middle" font-size="20" class="clock-icon">${sector.icon}</text>
                 `).join('')}
-                ${currentTimeHand}
+                <line id="current-time-hand" x1="${CLOCK_CENTER}" y1="${CLOCK_CENTER}" x2="${CLOCK_CENTER}" y2="${CLOCK_CENTER}" stroke="#007bff" stroke-width="2" style="display: none;" />
             </svg>
         </div>
     `;
     DOMElements.clockViewContainer.innerHTML = clockHTML;
+    setTimeout(updateCurrentTimeHand, 0);
 }
 
+function updateCurrentTimeHand() {
+    const hand = document.getElementById('current-time-hand');
+    if (!hand || !state.currentTime) return;
+
+    const currentHourDecimal = state.currentTime.getHours() + state.currentTime.getMinutes() / 60;
+
+    if (currentHourDecimal >= CLOCK_START_HOUR && currentHourDecimal < CLOCK_END_HOUR) {
+        const angle = timeToAngle(currentHourDecimal);
+        const endPos = polarToCartesian(CLOCK_CENTER, CLOCK_CENTER, CLOCK_INNER_RADIUS, angle);
+        hand.setAttribute('x2', String(endPos.x));
+        hand.setAttribute('y2', String(endPos.y));
+        hand.style.display = 'block';
+    } else {
+        hand.style.display = 'none';
+    }
+}
 
 function renderSettingsPopup() {
     if (!state.isSettingsOpen) {
@@ -387,6 +430,7 @@ function renderSettingsPopup() {
             const value = target.value;
             if (setting) {
                 state.settings[setting] = Number(value);
+                saveState();
             }
         });
     });
@@ -450,6 +494,7 @@ function generateSchedule() {
         
         state.isLoading = false;
         state.schedule = events;
+        saveState();
         render();
     }, 500);
 }
@@ -461,6 +506,7 @@ function shiftSchedule(minutes) {
         const newTime = eventTime + minutes / 60;
         return { ...event, time: formatTime(newTime) };
     });
+    saveState();
     render();
 }
 
@@ -470,6 +516,7 @@ function reset() {
     state.isLoading = false;
     state.isSettingsOpen = false;
     state.settings = { ...defaultSettings };
+    saveState();
     render();
 }
 
@@ -500,7 +547,7 @@ async function handleDownload(layout, buttonElement) {
     // Remove time indicator for cleaner image
     const indicator = captureContainer.querySelector('#current-time-indicator');
     if (indicator) indicator.remove();
-    const clockIndicator = captureContainer.querySelector('.current-time-hand');
+    const clockIndicator = captureContainer.querySelector('#current-time-hand');
     if (clockIndicator) clockIndicator.remove();
 
 
@@ -527,10 +574,14 @@ async function handleDownload(layout, buttonElement) {
 
 // Initialization
 document.addEventListener('DOMContentLoaded', () => {
+    // Load previous state from localStorage
+    loadState();
+
     // Set up event listeners
     DOMElements.timeOptionBtns.forEach(btn => {
         btn.addEventListener('click', () => {
             state.wakeUpTime = btn.dataset.time;
+            saveState();
             render();
         });
     });
@@ -565,6 +616,7 @@ document.addEventListener('DOMContentLoaded', () => {
         state.currentTime = new Date();
         if (state.schedule) {
             updateCurrentTimeIndicator();
+            updateCurrentTimeHand();
         }
     }, 60 * 1000);
 
