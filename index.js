@@ -23,6 +23,7 @@ let state = {
     isSettingsOpen: false,
     currentTime: new Date(),
     isDownloading: false,
+    downloadingLayout: null,
 };
 
 // --- LocalStorage Persistence ---
@@ -50,6 +51,7 @@ function loadState() {
                 currentTime: new Date(), // Always use fresh time
                 isLoading: false,       // Reset transient state
                 isSettingsOpen: false,
+                downloadingLayout: null,
             };
         }
     } catch (error) {
@@ -124,8 +126,6 @@ const DOMElements = {
     scheduleDate: document.getElementById('schedule-date'),
     shiftBackBtn: document.getElementById('shift-back-btn'),
     shiftForwardBtn: document.getElementById('shift-forward-btn'),
-    downloadHorizontalBtn: document.getElementById('download-horizontal-btn'),
-    downloadVerticalBtn: document.getElementById('download-vertical-btn'),
     resetBtn: document.getElementById('reset-btn'),
     horizontalCaptureContainer: document.getElementById('horizontal-capture-container'),
     verticalCaptureContainer: document.getElementById('vertical-capture-container'),
@@ -141,10 +141,7 @@ function render() {
     DOMElements.loader.style.display = state.isLoading ? 'block' : 'none';
     
     // Header buttons visibility
-    const showHeaderActions = !!state.schedule;
-    DOMElements.downloadHorizontalBtn.style.display = showHeaderActions ? 'flex' : 'none';
-    DOMElements.downloadVerticalBtn.style.display = showHeaderActions ? 'flex' : 'none';
-    DOMElements.resetBtn.style.display = showHeaderActions ? 'flex' : 'none';
+    DOMElements.resetBtn.style.display = state.schedule ? 'flex' : 'none';
 
     // Wake up time buttons
     DOMElements.timeOptionBtns.forEach(btn => {
@@ -356,11 +353,31 @@ function renderSettingsPopup() {
         return;
     }
 
-    const { milkInterval, morningNapOffset, morningNapDuration, afternoonNap1Offset, afternoonNap1Duration, afternoonNap2Offset, afternoonNap2Duration, bathOffset, bathDuration, bedtimeOffset } = state.settings;
+    let content = '';
+    let contentClass = '';
 
-    const content = state.schedule ? 
-        '<p class="settings-disabled-message">スケジュール作成後に設定は変更できません。やり直す場合はリセットボタンを押してください。</p>' :
-        `<fieldset class="customize-section">
+    if (state.schedule) {
+        // Schedule exists, show download options
+        const isDownloadingHorizontal = state.isDownloading && state.downloadingLayout === 'horizontal';
+        const isDownloadingVertical = state.isDownloading && state.downloadingLayout === 'vertical';
+
+        contentClass = 'settings-popup-content-actions';
+        content = `
+            <div class="popup-actions">
+                <button id="popup-download-horizontal" class="popup-action-btn" ${state.isDownloading ? 'disabled' : ''}>
+                    <span>横長で画像を保存</span>
+                    <svg class="${isDownloadingHorizontal ? 'spinning' : ''}" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 24 24"><path d="M21 6H3C1.9 6 1 6.9 1 8v8c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zM12 16.5l-4-4h2.5V9h3v3.5H16l-4 4z"/></svg>
+                </button>
+                <button id="popup-download-vertical" class="popup-action-btn" ${state.isDownloading ? 'disabled' : ''}>
+                    <span>縦長で画像を保存</span>
+                    <svg class="${isDownloadingVertical ? 'spinning' : ''}" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 24 24"><path d="M16 2H8C6.9 2 6 2.9 6 4v16c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-4 16.5l-4-4h2.5V11h3v3.5H16l-4 4z"/></svg>
+                </button>
+            </div>
+        `;
+    } else {
+        // No schedule, show settings form
+        const { milkInterval, morningNapOffset, morningNapDuration, afternoonNap1Offset, afternoonNap1Duration, afternoonNap2Offset, afternoonNap2Duration, bathOffset, bathDuration, bedtimeOffset } = state.settings;
+        content = `<fieldset class="customize-section">
             <legend>基本設定</legend>
             <div class="control-group">
                 <label for="milkInterval">ミルクの間隔 (N時間)</label>
@@ -405,10 +422,11 @@ function renderSettingsPopup() {
                 <input type="number" id="bedtimeOffset" data-setting="bedtimeOffset" value="${bedtimeOffset}" min="0" step="0.5" />
             </div>
         </fieldset>`;
+    }
     
     const popupHTML = `
         <div class="settings-popup-overlay">
-            <div class="settings-popup-content">
+            <div class="settings-popup-content ${contentClass}">
                 <button class="settings-popup-close">&times;</button>
                 ${content}
             </div>
@@ -419,21 +437,26 @@ function renderSettingsPopup() {
     // Add event listeners for the new elements
     const overlay = DOMElements.settingsPopupContainer.querySelector('.settings-popup-overlay');
     const closeBtn = DOMElements.settingsPopupContainer.querySelector('.settings-popup-close');
-    overlay.addEventListener('click', () => { state.isSettingsOpen = false; render(); });
-    closeBtn.addEventListener('click', () => { state.isSettingsOpen = false; render(); });
+    overlay.addEventListener('click', () => { if (!state.isDownloading) { state.isSettingsOpen = false; render(); } });
+    closeBtn.addEventListener('click', () => { if (!state.isDownloading) { state.isSettingsOpen = false; render(); } });
     DOMElements.settingsPopupContainer.querySelector('.settings-popup-content').addEventListener('click', (e) => e.stopPropagation());
 
-    DOMElements.settingsPopupContainer.querySelectorAll('input[type="number"]').forEach(input => {
-        input.addEventListener('change', (e) => {
-            const target = e.target;
-            const setting = target.dataset.setting;
-            const value = target.value;
-            if (setting) {
-                state.settings[setting] = Number(value);
-                saveState();
-            }
+    if (state.schedule) {
+        document.getElementById('popup-download-horizontal').addEventListener('click', () => handleDownload('horizontal'));
+        document.getElementById('popup-download-vertical').addEventListener('click', () => handleDownload('vertical'));
+    } else {
+        DOMElements.settingsPopupContainer.querySelectorAll('input[type="number"]').forEach(input => {
+            input.addEventListener('change', (e) => {
+                const target = e.target;
+                const setting = target.dataset.setting;
+                const value = target.value;
+                if (setting) {
+                    state.settings[setting] = Number(value);
+                    saveState();
+                }
+            });
         });
-    });
+    }
 }
 
 
@@ -515,19 +538,20 @@ function reset() {
     state.schedule = null;
     state.isLoading = false;
     state.isSettingsOpen = false;
+    state.downloadingLayout = null;
     state.settings = { ...defaultSettings };
-    saveState();
+    localStorage.removeItem('babyScheduleState'); // Clear storage on reset
     render();
 }
 
-async function handleDownload(layout, buttonElement) {
+async function handleDownload(layout) {
     if (state.isDownloading) return;
-    state.isDownloading = true;
 
-    buttonElement.classList.add('downloading');
+    state.isDownloading = true;
+    state.downloadingLayout = layout;
+    render();
+
     const actionButtons = [
-        DOMElements.downloadHorizontalBtn,
-        DOMElements.downloadVerticalBtn,
         DOMElements.resetBtn,
         DOMElements.settingsBtn,
         DOMElements.shiftBackBtn,
@@ -565,7 +589,9 @@ async function handleDownload(layout, buttonElement) {
         alert('画像の保存に失敗しました。');
     } finally {
         state.isDownloading = false;
-        buttonElement.classList.remove('downloading');
+        state.downloadingLayout = null;
+        state.isSettingsOpen = false;
+        render(); // Re-render to remove downloading state
         actionButtons.forEach(btn => btn.disabled = false);
         captureContainer.innerHTML = ''; // Clean up
     }
@@ -594,9 +620,6 @@ document.addEventListener('DOMContentLoaded', () => {
     DOMElements.shiftBackBtn.addEventListener('click', () => shiftSchedule(-30));
     DOMElements.shiftForwardBtn.addEventListener('click', () => shiftSchedule(30));
     DOMElements.resetBtn.addEventListener('click', reset);
-    DOMElements.downloadHorizontalBtn.addEventListener('click', (e) => handleDownload('horizontal', e.currentTarget));
-    DOMElements.downloadVerticalBtn.addEventListener('click', (e) => handleDownload('vertical', e.currentTarget));
-
 
     // Tooltip listener
     document.body.addEventListener('mousemove', (e) => {

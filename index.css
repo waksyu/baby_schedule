@@ -82,15 +82,6 @@ h1 {
     height: 24px;
 }
 
-.header-icon-btn.downloading {
-    cursor: wait;
-    background-color: #f0f0f0;
-}
-
-.header-icon-btn.downloading svg {
-    animation: spin 1s linear infinite;
-}
-
 .settings-btn svg {
     stroke: currentColor;
 }
@@ -454,13 +445,53 @@ input[type="number"] {
     color: #333;
 }
 
-.settings-disabled-message {
-    font-size: 0.9rem;
-    color: #888;
-    text-align: center;
-    margin: 0;
-    padding: 16px 0;
+/* Download Popup Styles */
+.settings-popup-content.settings-popup-content-actions {
+    padding: 24px;
 }
+.popup-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+.popup-action-btn {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    padding: 16px;
+    font-size: 1rem;
+    font-weight: 600;
+    font-family: inherit;
+    text-align: left;
+    background-color: #fff;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+    color: var(--text-color);
+}
+.popup-action-btn:hover {
+    background-color: #f0f0f0;
+}
+.popup-action-btn svg {
+    width: 24px;
+    height: 24px;
+    fill: currentColor;
+    flex-shrink: 0;
+    margin-left: 16px;
+}
+
+.popup-action-btn:disabled {
+    background-color: #f0f0f0;
+    cursor: wait;
+    color: #888;
+}
+
+.popup-action-btn svg.spinning {
+    animation: spin 1s linear infinite;
+}
+
 
 /* Download Image Container Styles */
 .download-image-container {
