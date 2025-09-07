@@ -10,8 +10,9 @@ const defaultSettings = {
     afternoonNap1Duration: 2,
     afternoonNap2Offset: 2,
     afternoonNap2Duration: 1,
-    bathOffset: 1,
-    bathDuration: 0.5,
+    bathStartTime: '17:00',
+    bathEndTime: '20:00',
+    bathOffsetHours: 1,
     bedtimeOffset: 0.5,
 };
 
@@ -45,9 +46,19 @@ function loadState() {
         const savedStateJSON = localStorage.getItem('babyScheduleState');
         if (savedStateJSON) {
             const savedState = JSON.parse(savedStateJSON);
+
+            // Migration from minutes to hours for bath offset
+            if (savedState.settings && savedState.settings.hasOwnProperty('bathOffsetMinutes')) {
+                savedState.settings.bathOffsetHours = (savedState.settings.bathOffsetMinutes / 60) || 1;
+                delete savedState.settings.bathOffsetMinutes;
+            }
+            
+            // 保存された設定が古い場合（新しい設定項目がない場合）にデフォルト値で補完
+            const mergedSettings = { ...defaultSettings, ...savedState.settings };
             state = {
                 ...state,
                 ...savedState,
+                settings: mergedSettings,
                 currentTime: new Date(), // Always use fresh time
                 isLoading: false,       // Reset transient state
                 isSettingsOpen: false,
@@ -376,7 +387,7 @@ function renderSettingsPopup() {
         `;
     } else {
         // No schedule, show settings form
-        const { milkInterval, morningNapOffset, morningNapDuration, afternoonNap1Offset, afternoonNap1Duration, afternoonNap2Offset, afternoonNap2Duration, bathOffset, bathDuration, bedtimeOffset } = state.settings;
+        const { milkInterval, morningNapOffset, morningNapDuration, afternoonNap1Offset, afternoonNap1Duration, afternoonNap2Offset, afternoonNap2Duration, bathStartTime, bathEndTime, bathOffsetHours, bedtimeOffset } = state.settings;
         content = `<fieldset class="customize-section">
             <legend>基本設定</legend>
             <div class="control-group">
@@ -410,12 +421,16 @@ function renderSettingsPopup() {
             </div>
             <legend>夜の準備</legend>
             <div class="control-group">
-                <label for="bathOffset">お風呂開始 (16時以降のミルクから, N時間後)</label>
-                <input type="number" id="bathOffset" data-setting="bathOffset" value="${bathOffset}" min="0" step="0.5" />
+                <label for="bathTimeRange">お風呂の時間帯</label>
+                <div class="time-range-setting">
+                    <input type="time" id="bathStartTime" data-setting="bathStartTime" value="${bathStartTime}" />
+                    <span>～</span>
+                    <input type="time" id="bathEndTime" data-setting="bathEndTime" value="${bathEndTime}" />
+                </div>
             </div>
             <div class="control-group">
-                <label for="bathDuration">お風呂の長さ (N時間)</label>
-                <input type="number" id="bathDuration" data-setting="bathDuration" value="${bathDuration}" min="0" step="0.5" />
+                <label for="bathOffsetHours">ミルク後のお風呂開始時間 (N時間後)</label>
+                <input type="number" id="bathOffsetHours" data-setting="bathOffsetHours" value="${bathOffsetHours}" min="0.5" max="2" step="0.25" />
             </div>
             <div class="control-group">
                 <label for="bedtimeOffset">寝かしつけ (お風呂の後, N時間後)</label>
@@ -445,13 +460,13 @@ function renderSettingsPopup() {
         document.getElementById('popup-download-horizontal').addEventListener('click', () => handleDownload('horizontal'));
         document.getElementById('popup-download-vertical').addEventListener('click', () => handleDownload('vertical'));
     } else {
-        DOMElements.settingsPopupContainer.querySelectorAll('input[type="number"]').forEach(input => {
+        DOMElements.settingsPopupContainer.querySelectorAll('input[type="number"], input[type="time"]').forEach(input => {
             input.addEventListener('change', (e) => {
                 const target = e.target;
                 const setting = target.dataset.setting;
                 const value = target.value;
                 if (setting) {
-                    state.settings[setting] = Number(value);
+                    state.settings[setting] = target.type === 'number' ? Number(value) : value;
                     saveState();
                 }
             });
@@ -473,6 +488,7 @@ function generateSchedule() {
         let bathTime = null;
         let bedtime = null;
 
+        // 1. Calculate all potential milk times for the day
         let potentialMilkTimes = [];
         let currentMilkTime = wakeUp;
         while (currentMilkTime < wakeUp + 24) {
@@ -480,20 +496,39 @@ function generateSchedule() {
             currentMilkTime += state.settings.milkInterval;
         }
         
-        const firstMilkAfter4PM = potentialMilkTimes.find(t => t >= 16);
-        if (firstMilkAfter4PM) {
-            bathTime = firstMilkAfter4PM + state.settings.bathOffset;
-            bedtime = bathTime + state.settings.bathDuration + state.settings.bedtimeOffset;
-        } else {
-            bedtime = wakeUp + 14;
+        // 2. Determine bath time based on new logic
+        const { bathStartTime, bathEndTime, bathOffsetHours, bedtimeOffset } = state.settings;
+        const bathWindowStart = parseTime(bathStartTime);
+        const bathWindowEnd = parseTime(bathEndTime);
+        const bathDuration = 0.5; // 30 minutes fixed
+
+        let foundBathTime = null;
+
+        // Find the first possible bath time that fits the criteria
+        for (const milkTime of potentialMilkTimes) {
+            const potentialBathTime = milkTime + bathOffsetHours;
+            if (potentialBathTime >= bathWindowStart && potentialBathTime < bathWindowEnd) {
+                foundBathTime = potentialBathTime;
+                break; // Use the first one found
+            }
         }
+
+        // Fallback: if no suitable time is found, use the start of the bath window
+        if (!foundBathTime) {
+            foundBathTime = bathWindowStart;
+        }
+        bathTime = foundBathTime;
+
+        // 3. Determine bedtime
+        bedtime = bathTime + bathDuration + bedtimeOffset;
         
+        // 4. Add milk events that occur before bedtime
         const milkTimes = potentialMilkTimes.filter(t => t < bedtime);
-        
         milkTimes.forEach((milkTime) => {
             events.push({ time: formatTime(milkTime), activity: 'ミルク', icon: '🍼', duration: 0.5 });
         });
 
+        // 5. Add nap events based on milk times
         if (milkTimes.length > 0) {
             const morningNapStart = milkTimes[0] + state.settings.morningNapOffset;
             events.push({ time: formatTime(morningNapStart), activity: 'お昼寝', icon: '😴', duration: state.settings.morningNapDuration });
@@ -507,12 +542,15 @@ function generateSchedule() {
              events.push({ time: formatTime(afternoonNap2Start), activity: 'お昼寝', icon: '😴', duration: state.settings.afternoonNap2Duration });
         }
         
+        // 6. Add bath event
         if (bathTime) {
-            events.push({ time: formatTime(bathTime), activity: 'お風呂', icon: '🛁', duration: state.settings.bathDuration });
+            events.push({ time: formatTime(bathTime), activity: 'お風呂', icon: '🛁', duration: bathDuration });
         }
         
+        // 7. Add bedtime event
         events.push({ time: formatTime(bedtime), activity: '就寝', icon: '🌙' });
 
+        // 8. Sort all events by time
         events.sort((a, b) => parseTime(a.time) - parseTime(b.time));
         
         state.isLoading = false;
